@@ -4,7 +4,7 @@ using RabbitMQ.Common;
 using System;
 using System.Collections.Generic;
 
-namespace StandartQueue
+namespace RabbitMQ.StandartQueue
 {
     class Program
     {
