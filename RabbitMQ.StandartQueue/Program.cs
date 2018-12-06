@@ -8,7 +8,7 @@ namespace RabbitMQ.StandartQueue
 {
     class Program
     {
-        private const string QueueName = "StandartQueue_ExampleQueue";
+        private const string QueueName = "StandartQueue_Queue";
 
         private static ConnectionFactory _connectionFactory;
         private static IConnection _connection;
@@ -16,7 +16,7 @@ namespace RabbitMQ.StandartQueue
 
         static void Main(string[] args)
         {
-            var payments = CreatePayments(6);
+            var payments = CreatePayments(50);
 
             CreateQueue();
 
@@ -79,8 +79,6 @@ namespace RabbitMQ.StandartQueue
             var strMessage = _model.BasicConsume(QueueName, true, consumer);
 
             consumer.Received += Consumer_Received;
-
-            var messageCount = GetMessagesCount(_model, QueueName);
         }
 
         private static void Consumer_Received(object sender, BasicDeliverEventArgs e)
