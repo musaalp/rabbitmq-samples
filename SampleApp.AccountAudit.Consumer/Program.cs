@@ -1,4 +1,4 @@
-﻿using System;
+﻿using SampleApp.AccountAudit.Consumer.RabbitMQ;
 
 namespace SampleApp.AccountAudit.Consumer
 {
@@ -6,7 +6,9 @@ namespace SampleApp.AccountAudit.Consumer
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            var client = new RabbitMQConsumer();
+            client.CreateConnection();
+            client.ProcessMessages();
         }
     }
 }
