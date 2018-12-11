@@ -1,4 +1,4 @@
-﻿using System;
+﻿using SampleApp.DirectPaymentCard.Consumer.RabbitMQ;
 
 namespace SampleApp.DirectPaymentCard.Consumer
 {
@@ -6,7 +6,9 @@ namespace SampleApp.DirectPaymentCard.Consumer
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            var client = new RabbitMQConsumer();
+            client.CreateConnection();
+            client.ProcessMessages();
         }
     }
 }
