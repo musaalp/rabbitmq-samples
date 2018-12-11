@@ -1,4 +1,4 @@
-﻿using System;
+﻿using SampleApp.PurchaseOrder.Consumer.RabbitMQ;
 
 namespace SampleApp.PurchaseOrder.Consumer
 {
@@ -6,7 +6,10 @@ namespace SampleApp.PurchaseOrder.Consumer
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            var client = new RabbitMQConsumer();
+            client.CreateConnection();
+            client.ProcessMessages();
+            client.Close();
         }
     }
 }
