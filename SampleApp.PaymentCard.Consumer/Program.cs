@@ -1,4 +1,4 @@
-﻿using System;
+﻿using SampleApp.PaymentCard.Consumer.RabbitMQ;
 
 namespace SampleApp.PaymentCard.Consumer
 {
@@ -6,7 +6,9 @@ namespace SampleApp.PaymentCard.Consumer
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            var client = new RabbitMQConsumer();
+            client.CreateConnection();
+            client.ProcessMessages();
         }
     }
 }
