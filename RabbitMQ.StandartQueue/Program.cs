@@ -1,8 +1,10 @@
-﻿using RabbitMQ.Client;
+﻿using Microsoft.Extensions.DependencyInjection;
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Common;
 using System;
 using System.Collections.Generic;
+
 
 namespace RabbitMQ.StandartQueue
 {
@@ -10,24 +12,26 @@ namespace RabbitMQ.StandartQueue
     {
         private const string QueueName = "StandartQueue_Queue";
 
-        private static ConnectionFactory _connectionFactory;
-        private static IConnection _connection;
-        private static IModel _model;
-
         static void Main(string[] args)
         {
+            var serviceCollection = new ServiceCollection().AddTransient<ConnectionFactory>();
+
+            var connectionFactory = serviceCollection.BuildServiceProvider().GetService<ConnectionFactory>();
+            var connection = connectionFactory.CreateConnection();
+            var channel = connection.CreateModel();
+
             var payments = CreatePayments(50);
 
-            CreateQueue();
+            CreateQueue(channel);
 
             foreach (var payment in payments)
             {
-                SendMessage(payment);
+                SendMessage(payment, channel);
             }
 
-            Console.WriteLine();
+            Console.WriteLine("-----------------------------");
 
-            Receive();
+            Receive(channel);
 
             Console.ReadLine();
         }
@@ -51,32 +55,22 @@ namespace RabbitMQ.StandartQueue
             return paymentList;
         }
 
-        private static void CreateQueue()
+        private static void CreateQueue(IModel channel)
         {
-            _connectionFactory = new ConnectionFactory
-            {
-                HostName = "localhost",
-                UserName = "guest",
-                Password = "guest"
-            };
-
-            _connection = _connectionFactory.CreateConnection();
-
-            _model = _connection.CreateModel();
-            _model.QueueDeclare(QueueName, true, false, false, null);
+            channel.QueueDeclare(QueueName, true, false, false, null);
         }
 
-        private static void SendMessage(Payment message)
+        private static void SendMessage(Payment message, IModel channel)
         {
-            _model.BasicPublish("", QueueName, null, message.Serialize());
+            channel.BasicPublish("", QueueName, null, message.Serialize());
             Console.WriteLine($"Payment message sent : {message.CardNumber} | {message.Amount} | {message.Name}");
         }
 
-        private static void Receive()
+        private static void Receive(IModel channel)
         {
-            var consumer = new EventingBasicConsumer(_model);
+            var consumer = new EventingBasicConsumer(channel);
 
-            var strMessage = _model.BasicConsume(QueueName, true, consumer);
+            var strMessage = channel.BasicConsume(QueueName, true, consumer);
 
             consumer.Received += Consumer_Received;
         }
@@ -86,12 +80,6 @@ namespace RabbitMQ.StandartQueue
             var message = e.Body.DeSerialize(typeof(Payment)) as Payment;
 
             Console.WriteLine($" Message Received : {message.CardNumber} | {message.Amount} | {message.Name}");
-        }
-
-        private static uint GetMessagesCount(IModel channel, string queueName)
-        {
-            var count = channel.QueueDeclare(queueName, true, false, false, null).MessageCount;
-            return count;
         }
     }
 }
