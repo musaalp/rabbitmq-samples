@@ -1,9 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using RabbitMQ.Client;
+﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Common;
 using System;
-using System.Collections.Generic;
 
 
 namespace RabbitMQ.StandartQueue
@@ -14,45 +12,28 @@ namespace RabbitMQ.StandartQueue
 
         static void Main(string[] args)
         {
-            var serviceCollection = new ServiceCollection().AddTransient<ConnectionFactory>();
-
-            var connectionFactory = serviceCollection.BuildServiceProvider().GetService<ConnectionFactory>();
+            var connectionFactory = ConnectionFactoryProvider.Get();
             var connection = connectionFactory.CreateConnection();
             var channel = connection.CreateModel();
 
-            var payments = CreatePayments(50);
+            var payments = new SampleDataCreator().CreatePayments(20);
 
             CreateQueue(channel);
 
+            Console.WriteLine("-----------------------------------------------------------------------------");
+            Console.WriteLine(string.Format("|{0,22}|{1,15}|{2,15}|{3,20}|", "Description", "Card Number", "Amount", "Name"));
+            Console.WriteLine("-----------------------------------------------------------------------------");
             foreach (var payment in payments)
             {
                 SendMessage(payment, channel);
             }
 
-            Console.WriteLine("-----------------------------");
+            Console.WriteLine();
+            Console.WriteLine("---------------------------------------------------------------------------------");
+            Console.WriteLine(string.Format("|{0,26}|{1,15}|{2,15}|{3,20}|", "Description", "Card Number", "Amount", "Name"));
+            Console.WriteLine("---------------------------------------------------------------------------------");
 
-            Receive(channel);
-
-            Console.ReadLine();
-        }
-
-        private static IEnumerable<Payment> CreatePayments(int sampleCount)
-        {
-            var paymentList = new List<Payment>();
-
-            for (int i = 1; i < sampleCount; i++)
-            {
-                var payment = new Payment
-                {
-                    Amount = new Random().Next(1, 10) * i,
-                    CardNumber = i.ToString(),
-                    Name = $"Customer Name {i}"
-                };
-
-                paymentList.Add(payment);
-            }
-
-            return paymentList;
+            ReceiveMessages(channel);
         }
 
         private static void CreateQueue(IModel channel)
@@ -63,10 +44,10 @@ namespace RabbitMQ.StandartQueue
         private static void SendMessage(Payment message, IModel channel)
         {
             channel.BasicPublish("", QueueName, null, message.Serialize());
-            Console.WriteLine($"Payment message sent : {message.CardNumber} | {message.Amount} | {message.Name}");
+            Console.WriteLine("Payment message sent : " + string.Format("|{0,15}|{1,15}|{2,20}|", message.CardNumber, message.Amount, message.Name));
         }
 
-        private static void Receive(IModel channel)
+        private static void ReceiveMessages(IModel channel)
         {
             var consumer = new EventingBasicConsumer(channel);
 
@@ -78,8 +59,7 @@ namespace RabbitMQ.StandartQueue
         private static void Consumer_Received(object sender, BasicDeliverEventArgs e)
         {
             var message = e.Body.DeSerialize(typeof(Payment)) as Payment;
-
-            Console.WriteLine($" Message Received : {message.CardNumber} | {message.Amount} | {message.Name}");
+            Console.WriteLine("Payment message received : " + string.Format("|{0,15}|{1,15}|{2,20}|", message.CardNumber, message.Amount, message.Name));
         }
     }
 }
