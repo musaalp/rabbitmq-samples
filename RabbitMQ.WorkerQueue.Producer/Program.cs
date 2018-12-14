@@ -1,7 +1,6 @@
 ﻿using RabbitMQ.Client;
 using RabbitMQ.Common;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 
 namespace RabbitMQ.WorkerQueue.Producer
@@ -10,61 +9,36 @@ namespace RabbitMQ.WorkerQueue.Producer
     {
         private const string QueueName = "WorkerQueue_Queue";
 
-        private static ConnectionFactory _connectionFactory;
-        private static IConnection _connection;
-        private static IModel _model;
-
         static void Main(string[] args)
         {
-            var payments = CreatePayments(5154);
+            var connectionFactory = ConnectionFactoryProvider.Get();
+            var connection = connectionFactory.CreateConnection();
+            var channel = connection.CreateModel();
 
-            CreateQueue();
+            var payments = new SampleDataCreator().CreatePayments(200);
+
+            CreateQueue(channel);
+
+            Console.WriteLine("-----------------------------------------------------------------------------");
+            Console.WriteLine(string.Format("|{0,22}|{1,15}|{2,15}|{3,20}|", "Description", "Card Number", "Amount", "Name"));
+            Console.WriteLine("-----------------------------------------------------------------------------");
 
             foreach (var payment in payments)
             {
-                Thread.Sleep(1000);
-                SendMessage(payment);
+                SendMessage(payment, channel);
             }
         }
 
-        private static IEnumerable<Payment> CreatePayments(int sampleCount)
+        private static void CreateQueue(IModel channel)
         {
-            var paymentList = new List<Payment>();
-
-            for (int i = 1; i < sampleCount; i++)
-            {
-                var payment = new Payment
-                {
-                    Amount = new Random().Next(1, 10) * i,
-                    CardNumber = i.ToString(),
-                    Name = $"Customer Name {i}"
-                };
-
-                paymentList.Add(payment);
-            }
-
-            return paymentList;
+            channel.QueueDeclare(QueueName, true, false, false, null);
         }
 
-        private static void CreateQueue()
+        private static void SendMessage(Payment message, IModel channel)
         {
-            _connectionFactory = new ConnectionFactory
-            {
-                HostName = "localhost",
-                UserName = "guest",
-                Password = "guest"
-            };
-
-            _connection = _connectionFactory.CreateConnection();
-
-            _model = _connection.CreateModel();
-            _model.QueueDeclare(QueueName, true, false, false, null);
-        }
-
-        private static void SendMessage(Payment message)
-        {
-            _model.BasicPublish("", QueueName, null, message.Serialize());
-            Console.WriteLine($"Payment message sent : {message.CardNumber} | {message.Amount} | {message.Name}");
+            Thread.Sleep(500);
+            channel.BasicPublish("", QueueName, null, message.Serialize());
+            Console.WriteLine("Payment message sent : " + string.Format("|{0,15}|{1,15}|{2,20}|", message.CardNumber, message.Amount, message.Name));
         }
     }
 }
