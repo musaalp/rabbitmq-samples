@@ -10,20 +10,23 @@ namespace RabbitMQ.PublishSubscribe.Publisher
     {
         private const string ExchangeName = "PublishSubscribe_Exchange";
 
-        private static ConnectionFactory _connectionFactory;
-        private static IConnection _connection;
-        private static IModel _model;
-
         static void Main(string[] args)
         {
-            var payments = CreatePayments(5154);
+            var connectionFactory = ConnectionFactoryProvider.Get();
+            var connection = connectionFactory.CreateConnection();
+            var channel = connection.CreateModel();
+            channel.ExchangeDeclare(ExchangeName, "fanout", false);
 
-            CreateConnection();
+            var payments = CreatePayments(1000);
+
+            Console.WriteLine("-----------------------------------------------------------------------------");
+            Console.WriteLine(string.Format("|{0,22}|{1,15}|{2,15}|{3,20}|", "Description", "Card Number", "Amount", "Name"));
+            Console.WriteLine("-----------------------------------------------------------------------------");
 
             foreach (var payment in payments)
             {
-                Thread.Sleep(1000);
-                SendMessage(payment);
+                Thread.Sleep(500);
+                SendMessage(payment, channel);
             }
         }
 
@@ -46,25 +49,10 @@ namespace RabbitMQ.PublishSubscribe.Publisher
             return paymentList;
         }
 
-        private static void CreateConnection()
+        private static void SendMessage(Payment message, IModel channel)
         {
-            _connectionFactory = new ConnectionFactory
-            {
-                HostName = "localhost",
-                UserName = "guest",
-                Password = "guest"
-            };
-
-            _connection = _connectionFactory.CreateConnection();
-
-            _model = _connection.CreateModel();
-            _model.ExchangeDeclare(ExchangeName, "fanout", false);
-        }
-
-        private static void SendMessage(Payment message)
-        {
-            _model.BasicPublish(ExchangeName, "", null, message.Serialize());
-            Console.WriteLine($"Payment message sent : {message.CardNumber} | {message.Amount} | {message.Name}");
+            channel.BasicPublish(ExchangeName, "", null, message.Serialize());
+            Console.WriteLine("Payment message sent : " + string.Format("|{0,15}|{1,15}|{2,20}|", message.CardNumber, message.Amount, message.Name));
         }
     }
 }
