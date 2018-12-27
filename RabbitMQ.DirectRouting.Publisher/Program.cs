@@ -13,16 +13,17 @@ namespace RabbitMQ.DirectRouting.Publisher
         private const string CardPaymentQueueName = "CardPaymentDirectRouting_Queue";
         private const string PurchaseOrderQueueName = "PurchaseOrderDirectRouting_Queue";
 
-        private static ConnectionFactory _factory;
-        private static IConnection _connection;
-        private static IModel _model;
-
         static void Main(string[] args)
         {
-            var payments = CreatePayments(100);
-            var purchaseOrders = CreatePurchaseOrder(100);
+            var connectionFactory = ConnectionFactoryProvider.Get();
+            var connection = connectionFactory.CreateConnection();
+            var channel = connection.CreateModel();
 
-            CreateConnection();
+            var dataCreator = new SampleDataCreator();
+            var payments = dataCreator.CreatePayments(100);
+            var purchaseOrders = dataCreator.CreatePurchaseOrder(100);
+
+            CreateConnection(channel);
 
             var paymentsQueue = new Queue<Payment>(payments);
             var purchaseOrdersQueue = new Queue<PurchaseOrder>(purchaseOrders);
@@ -30,85 +31,46 @@ namespace RabbitMQ.DirectRouting.Publisher
             var onOff = true;
 
             var count = payments.Count() + purchaseOrders.Count();
+
+            Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
+            Console.WriteLine(string.Format("|{0,25}|{1,20}|{2,20}|{3,20}|{4,20}|", "Description", "Name", "Amount", "Number", "Other"));
+            Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
+
             for (int i = 0; i < count; i++)
             {
                 if (onOff)
                 {
                     var payment = paymentsQueue.Dequeue();
-                    SendMessage(payment.Serialize(), "CardPayment");
-                    Console.WriteLine($"Card Payment Sent: {payment.CardNumber}, £{payment.Amount}");
+                    SendMessage(payment.Serialize(), "CardPayment", channel);
+                    Console.WriteLine(string.Format("|{0,25}|{1,20}|{2,20}|{3,20}|", "Payment message sent: ", payment.Name, payment.Amount, payment.CardNumber));
                     onOff = false;
                 }
                 else
                 {
                     var purchaseOrder = purchaseOrdersQueue.Dequeue();
-                    SendMessage(purchaseOrder.Serialize(), "PurchaseOrder");
-                    Console.WriteLine($"Purchase Order Sent: {purchaseOrder.PurchaseOrderNumber}, {purchaseOrder.CompanyName}, £{purchaseOrder.Amount}, {purchaseOrder.PaymentDayTerms}");
+                    SendMessage(purchaseOrder.Serialize(), "PurchaseOrder", channel);
+                    Console.WriteLine(string.Format("|{0,25}|{1,20}|{2,20}|{3,20}|{4,20}|", "Purchase order sent: ", purchaseOrder.CompanyName, purchaseOrder.Amount, purchaseOrder.PurchaseOrderNumber, purchaseOrder.PaymentDayTerms));
+                    Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
                     onOff = true;
                 }
             }
         }
 
-        private static IEnumerable<Payment> CreatePayments(int sampleCount)
+        private static void CreateConnection(IModel channel)
         {
-            var paymentList = new List<Payment>();
+            channel.ExchangeDeclare(ExchangeName, "direct");
 
-            for (int i = 1; i < sampleCount; i++)
-            {
-                var payment = new Payment
-                {
-                    Amount = new Random().Next(1, 10) * i,
-                    CardNumber = i.ToString(),
-                    Name = $"Customer Name {i}"
-                };
+            channel.QueueDeclare(CardPaymentQueueName, true, false, false, null);
+            channel.QueueDeclare(PurchaseOrderQueueName, true, false, false, null);
 
-                paymentList.Add(payment);
-            }
-
-            return paymentList;
+            channel.QueueBind(CardPaymentQueueName, ExchangeName, "CardPayment");
+            channel.QueueBind(PurchaseOrderQueueName, ExchangeName, "PurchaseOrder");
         }
 
-        private static IEnumerable<PurchaseOrder> CreatePurchaseOrder(int sampleCount)
+        private static void SendMessage(byte[] message, string routingKey, IModel channel)
         {
-            var companyList = new char[] { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K' };
-
-            var purchaseOrderList = new List<PurchaseOrder>();
-
-            for (int i = 1; i < sampleCount; i++)
-            {
-                var randomNumber = new Random().Next(1, companyList.Length - 1);
-
-                var payment = new PurchaseOrder
-                {
-                    Amount = randomNumber * 12.5M,
-                    CompanyName = companyList[randomNumber].ToString(),
-                    PaymentDayTerms = randomNumber * 5,
-                    PurchaseOrderNumber = i
-                };
-
-                purchaseOrderList.Add(payment);
-            }
-
-            return purchaseOrderList;
-        }
-
-        private static void CreateConnection()
-        {
-            _factory = new ConnectionFactory { HostName = "localhost", UserName = "guest", Password = "guest" };
-            _connection = _factory.CreateConnection();
-            _model = _connection.CreateModel();
-            _model.ExchangeDeclare(ExchangeName, "direct");
-            _model.QueueDeclare(CardPaymentQueueName, true, false, false, null);
-            _model.QueueDeclare(PurchaseOrderQueueName, true, false, false, null);
-
-            _model.QueueBind(CardPaymentQueueName, ExchangeName, "CardPayment");
-            _model.QueueBind(PurchaseOrderQueueName, ExchangeName, "PurchaseOrder");
-        }
-
-        private static void SendMessage(byte[] message, string routingKey)
-        {
-            Thread.Sleep(1000);
-            _model.BasicPublish(ExchangeName, routingKey, null, message);
+            Thread.Sleep(500);
+            channel.BasicPublish(ExchangeName, routingKey, null, message);
         }
     }
 }
